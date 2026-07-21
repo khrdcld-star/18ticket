@@ -1,0 +1,1195 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0">
+<title>青春18きっぷ 旅の手帖｜広島⇄関東</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+:root{
+  --navy:#1c2f4a;
+  --navy-deep:#101d30;
+  --paper:#f4efe1;
+  --paper-2:#ece4cf;
+  --lemon:#e8b730;
+  --lemon-soft:#f3d27a;
+  --ticket-edge:#cfc6ab;
+  --ink:#21262b;
+  --ink-soft:#5b6470;
+  --line-red:#b5483f;
+  --line-green:#3f7a5c;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;}
+body{
+  font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+  background:var(--navy-deep);
+  color:var(--ink);
+  overscroll-behavior:none;
+  -webkit-font-smoothing:antialiased;
+}
+
+#app{
+  max-width:480px;
+  margin:0 auto;
+  min-height:100vh;
+  background:var(--paper);
+  position:relative;
+  display:flex;
+  flex-direction:column;
+  box-shadow:0 0 40px rgba(0,0,0,.5);
+}
+
+/* ---------- Header : 硬券（きっぷ）モチーフ ---------- */
+header.app-header{
+  background:
+    repeating-linear-gradient(135deg, rgba(255,255,255,.035) 0px, rgba(255,255,255,.035) 2px, transparent 2px, transparent 10px),
+    linear-gradient(135deg, var(--navy) 0%, #233c5e 60%, var(--navy) 100%);
+  color:var(--paper);
+  padding:calc(14px + var(--safe-top)) 18px 14px;
+  position:relative;
+  overflow:hidden;
+  border-bottom:4px solid var(--lemon);
+}
+header.app-header::after{
+  content:"";
+  position:absolute;
+  right:-30px; top:-30px;
+  width:140px;height:140px;
+  border:3px dashed rgba(244,239,225,.25);
+  border-radius:50%;
+}
+.ticket-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+}
+.ticket-eyebrow{
+  font-size:11px;
+  letter-spacing:.18em;
+  color:var(--lemon-soft);
+  font-weight:700;
+  margin:0 0 2px;
+}
+.ticket-title{
+  font-size:21px;
+  font-weight:800;
+  margin:0;
+  letter-spacing:.02em;
+  line-height:1.3;
+}
+.ticket-stamp{
+  flex:0 0 auto;
+  width:54px;height:54px;
+  border:2.5px solid var(--lemon);
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:11px;
+  font-weight:800;
+  color:var(--lemon);
+  text-align:center;
+  line-height:1.15;
+  transform:rotate(-8deg);
+  letter-spacing:.05em;
+}
+.route-strip{
+  margin-top:12px;
+  font-size:12.5px;
+  color:var(--paper);
+  display:flex;
+  align-items:center;
+  gap:6px;
+  opacity:.92;
+  flex-wrap:wrap;
+}
+.route-strip b{color:var(--lemon-soft);font-weight:800;}
+.route-strip .arrow{color:var(--lemon-soft);}
+
+/* ---------- Tabs (bottom nav) ---------- */
+nav.tabbar{
+  position:sticky;
+  bottom:0;
+  display:flex;
+  background:var(--navy);
+  border-top:1px solid #0d1726;
+  padding-bottom:var(--safe-bottom);
+  z-index:50;
+}
+nav.tabbar button{
+  flex:1;
+  background:none;
+  border:none;
+  color:#9fb0c8;
+  padding:9px 2px 10px;
+  font-size:10.5px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:3px;
+  font-weight:600;
+  cursor:pointer;
+  letter-spacing:.02em;
+}
+nav.tabbar button .ico{font-size:19px;line-height:1;}
+nav.tabbar button.active{color:var(--lemon);}
+nav.tabbar button.active .ico{transform:translateY(-1px);}
+
+/* ---------- Main panels ---------- */
+main{
+  flex:1;
+  overflow-y:auto;
+  padding:16px 16px 28px;
+  background:
+    radial-gradient(circle at 95% 0%, rgba(28,47,74,.05), transparent 40%),
+    var(--paper);
+}
+.panel{display:none;}
+.panel.active{display:block; animation:fadeIn .25s ease;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
+
+h2.panel-title{
+  font-size:17px;
+  font-weight:800;
+  color:var(--navy);
+  margin:0 0 4px;
+  display:flex;
+  align-items:center;
+  gap:7px;
+}
+p.panel-desc{
+  font-size:12.5px;
+  color:var(--ink-soft);
+  margin:0 0 16px;
+  line-height:1.5;
+}
+
+/* ---------- Card (ticket-stub style) ---------- */
+.card{
+  background:#fffdf7;
+  border:1px solid var(--ticket-edge);
+  border-radius:10px;
+  padding:14px 14px 14px 16px;
+  margin-bottom:14px;
+  position:relative;
+  box-shadow:0 1px 3px rgba(28,47,74,.07);
+}
+.card::before{
+  content:"";
+  position:absolute;
+  left:0;top:10px;bottom:10px;
+  width:4px;
+  background:var(--lemon);
+  border-radius:0 3px 3px 0;
+}
+
+/* perforation divider */
+.perf{
+  border:none;
+  height:1px;
+  background:repeating-linear-gradient(to right, var(--ticket-edge) 0 5px, transparent 5px 10px);
+  margin:10px 0;
+}
+
+/* ---------- Form elements ---------- */
+label.field-label{
+  display:block;
+  font-size:11.5px;
+  font-weight:700;
+  color:var(--navy);
+  margin:0 0 5px;
+  letter-spacing:.03em;
+}
+select, input[type=text]{
+  width:100%;
+  padding:11px 12px;
+  border:1.5px solid var(--ticket-edge);
+  border-radius:8px;
+  background:#fff;
+  font-size:15px;
+  color:var(--ink);
+  font-family:inherit;
+  appearance:none;
+  -webkit-appearance:none;
+}
+select:focus, input:focus{outline:2px solid var(--lemon); outline-offset:1px;}
+.field-row{margin-bottom:12px;}
+.btn-primary{
+  width:100%;
+  background:var(--navy);
+  color:var(--paper);
+  border:none;
+  padding:13px;
+  border-radius:9px;
+  font-size:15px;
+  font-weight:800;
+  letter-spacing:.04em;
+  cursor:pointer;
+  margin-top:6px;
+  box-shadow:0 2px 0 rgba(0,0,0,.15);
+}
+.btn-primary:active{transform:translateY(1px); box-shadow:none;}
+.btn-secondary{
+  width:100%;
+  background:#fff;
+  color:var(--navy);
+  border:1.5px solid var(--navy);
+  padding:11px;
+  border-radius:9px;
+  font-size:13.5px;
+  font-weight:700;
+  cursor:pointer;
+}
+.swap-btn{
+  display:flex;align-items:center;justify-content:center;
+  width:36px;height:36px;border-radius:50%;
+  background:var(--paper-2); border:1px solid var(--ticket-edge);
+  color:var(--navy); font-size:15px; cursor:pointer; margin:0 auto 12px;
+}
+
+/* ---------- Disclaimer ---------- */
+.disclaimer{
+  font-size:11px;
+  color:#8a6b1e;
+  background:#fff8e6;
+  border:1px solid #ecd28f;
+  border-radius:8px;
+  padding:9px 11px;
+  line-height:1.5;
+  margin-bottom:14px;
+  display:flex;
+  gap:7px;
+}
+.disclaimer .mark{flex:0 0 auto;}
+
+/* ---------- Timetable result ---------- */
+.leg{
+  display:flex;
+  gap:10px;
+  margin-bottom:0;
+}
+.leg-line{
+  flex:0 0 22px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+}
+.leg-dot{
+  width:11px;height:11px;border-radius:50%;
+  background:var(--navy); border:2px solid var(--lemon);
+}
+.leg-track{flex:1;width:2px;background:var(--ticket-edge); margin:2px 0;}
+.leg-body{flex:1; padding-bottom:18px;}
+.leg-body:last-child{padding-bottom:0;}
+.leg-time{font-weight:800; color:var(--navy); font-size:14.5px;}
+.leg-station{font-weight:700; font-size:15px; margin:1px 0 3px;}
+.leg-meta{font-size:12px; color:var(--ink-soft); line-height:1.5;}
+.leg-meta .badge{
+  display:inline-block;
+  background:var(--paper-2);
+  color:var(--navy);
+  font-size:10.5px;
+  font-weight:700;
+  padding:1px 7px;
+  border-radius:10px;
+  margin-right:5px;
+}
+.leg-meta .warn{
+  display:block;
+  color:var(--line-red);
+  font-weight:700;
+  margin-top:3px;
+}
+.leg-platform{font-size:11.5px; color:var(--ink-soft); margin-top:2px;}
+.leg-platform .pin{color:var(--navy);}
+
+/* ---------- Spot info ---------- */
+.station-select-row{display:flex; gap:8px; margin-bottom:14px; overflow-x:auto; padding-bottom:4px;}
+.chip{
+  flex:0 0 auto;
+  padding:7px 14px;
+  border-radius:20px;
+  border:1.5px solid var(--ticket-edge);
+  background:#fff;
+  font-size:12.5px;
+  font-weight:700;
+  color:var(--navy);
+  white-space:nowrap;
+  cursor:pointer;
+}
+.chip.active{background:var(--navy); color:var(--lemon-soft); border-color:var(--navy);}
+.spot-section-title{
+  font-size:12px; font-weight:800; color:var(--navy);
+  margin:14px 0 7px; display:flex; align-items:center; gap:5px;
+}
+.tag-list{display:flex; flex-wrap:wrap; gap:7px;}
+.tag-pill{
+  background:var(--paper-2);
+  color:var(--ink);
+  font-size:12.5px;
+  padding:6px 11px;
+  border-radius:8px;
+  border:1px solid var(--ticket-edge);
+}
+
+/* ---------- Weather ---------- */
+.weather-hero{
+  background:linear-gradient(160deg, var(--navy) 0%, #2c4a72 100%);
+  color:var(--paper);
+  border-radius:14px;
+  padding:18px;
+  margin-bottom:14px;
+  position:relative;
+  overflow:hidden;
+}
+.weather-hero .wcity{font-size:13px; color:var(--lemon-soft); font-weight:700; letter-spacing:.04em;}
+.weather-hero .wtemp{font-size:42px; font-weight:800; margin:2px 0 0; line-height:1;}
+.weather-hero .wdesc{font-size:13.5px; margin-top:4px; opacity:.9;}
+.weather-hero .wicon{position:absolute; right:16px; top:14px; font-size:46px; opacity:.9;}
+.wgrid{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:14px;}
+.wgrid .wcell{background:rgba(255,255,255,.1); border-radius:8px; padding:8px 6px; text-align:center;}
+.wgrid .wcell .wl{font-size:10px; opacity:.75;}
+.wgrid .wcell .wv{font-size:14px; font-weight:800; margin-top:2px;}
+.forecast-row{
+  display:flex; gap:8px; overflow-x:auto; padding-bottom:6px;
+}
+.fday{
+  flex:0 0 auto; width:68px;
+  background:#fff; border:1px solid var(--ticket-edge); border-radius:10px;
+  padding:9px 6px; text-align:center;
+}
+.fday .fd-label{font-size:11px; font-weight:700; color:var(--navy);}
+.fday .fd-icon{font-size:22px; margin:4px 0;}
+.fday .fd-temp{font-size:12px; font-weight:700;}
+.fday .fd-temp .lo{color:var(--ink-soft); font-weight:500;}
+
+/* ---------- Course cards ---------- */
+.course-card{
+  background:#fffdf7;
+  border:1px solid var(--ticket-edge);
+  border-radius:12px;
+  padding:14px;
+  margin-bottom:12px;
+  cursor:pointer;
+  transition:box-shadow .15s;
+}
+.course-card.selected{border-color:var(--lemon); box-shadow:0 0 0 2px var(--lemon-soft) inset;}
+.course-card h3{margin:0 0 4px; font-size:15.5px; color:var(--navy); font-weight:800;}
+.course-card p{margin:0 0 8px; font-size:12.5px; color:var(--ink-soft); line-height:1.5;}
+.course-tags{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;}
+.course-tags span{
+  font-size:10.5px; font-weight:700; color:var(--navy);
+  background:var(--paper-2); padding:3px 9px; border-radius:10px;
+}
+.course-route{font-size:11.5px; color:var(--ink-soft); line-height:1.6;}
+.course-duration{
+  font-size:11.5px; font-weight:700; color:var(--line-green); margin-top:8px;
+}
+
+/* ---------- Map panel ---------- */
+#mapview{
+  width:100%; height:340px; border-radius:12px; overflow:hidden;
+  border:1px solid var(--ticket-edge);
+  margin-bottom:12px;
+}
+.map-legend{
+  display:flex; flex-wrap:wrap; gap:10px; font-size:11px; color:var(--ink-soft);
+  margin-bottom:14px;
+}
+.map-legend span{display:flex; align-items:center; gap:5px;}
+.legend-dot{width:10px;height:10px;border-radius:50%; display:inline-block;}
+.map-station-list .ms-item{
+  display:flex; align-items:center; gap:10px;
+  padding:9px 0; border-bottom:1px solid var(--ticket-edge);
+  font-size:13px;
+}
+.map-station-list .ms-item:last-child{border-bottom:none;}
+.ms-num{
+  flex:0 0 22px;height:22px;border-radius:50%;background:var(--navy);color:var(--lemon-soft);
+  font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;
+}
+.ms-weather{margin-left:auto; font-size:12px; color:var(--ink-soft); display:flex; align-items:center; gap:4px;}
+
+/* loading / empty */
+.loading-row{display:flex; align-items:center; gap:8px; color:var(--ink-soft); font-size:13px; padding:10px 0;}
+.spinner{
+  width:14px;height:14px;border-radius:50%;
+  border:2px solid var(--ticket-edge); border-top-color:var(--navy);
+  animation:spin .7s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg);}}
+.empty-hint{font-size:12.5px; color:var(--ink-soft); text-align:center; padding:30px 10px;}
+
+::-webkit-scrollbar{display:none;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header class="app-header">
+    <div class="ticket-row">
+      <div>
+        <p class="ticket-eyebrow">SEISHUN 18 TICKET TRIP NOTE</p>
+        <h1 class="ticket-title">青春18きっぷ<br>旅の手帖</h1>
+      </div>
+      <div class="ticket-stamp">広島<br>⇄<br>関東</div>
+    </div>
+    <div class="route-strip">
+      <b>山陽本線</b><span class="arrow">→</span><b>JR神戸線・京都線・琵琶湖線</b><span class="arrow">→</span><b>東海道本線</b>
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- panels are injected by app.js -->
+  </main>
+
+  <nav class="tabbar" id="tabbar">
+    <button data-panel="panel-route" class="active"><span class="ico">🚃</span>時刻表</button>
+    <button data-panel="panel-spot"><span class="ico">🏯</span>途中駅</button>
+    <button data-panel="panel-weather"><span class="ico">☀️</span>天気</button>
+    <button data-panel="panel-course"><span class="ico">🧭</span>コース</button>
+    <button data-panel="panel-map"><span class="ico">🗺️</span>地図</button>
+  </nav>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+// ============================================================
+// 青春18きっぷ 旅の手帖 - データファイル
+// 広島(中国地方) ⇄ 関東 ルートのデータ
+// 時刻は「典型的なパターンに基づく目安」。実際の出発前に
+// NAVITIME / Yahoo!乗換案内 等で必ず最新時刻を確認してください。
+// ============================================================
+
+// ---- 駅マスタ（緯度経度・地方） ----
+const STATIONS = {
+  "広島":   { lat: 34.3978, lng: 132.4753, region: "中国" },
+  "三原":   { lat: 34.3996, lng: 133.0786, region: "中国" },
+  "糸崎":   { lat: 34.3856, lng: 133.0917, region: "中国" },
+  "尾道":   { lat: 34.4089, lng: 133.1958, region: "中国" },
+  "福山":   { lat: 34.4858, lng: 133.3625, region: "中国" },
+  "岡山":   { lat: 34.6617, lng: 133.9189, region: "中国" },
+  "相生":   { lat: 34.8011, lng: 134.4669, region: "近畿" },
+  "姫路":   { lat: 34.8281, lng: 134.6925, region: "近畿" },
+  "大阪":   { lat: 34.7025, lng: 135.4959, region: "近畿" },
+  "京都":   { lat: 34.9858, lng: 135.7588, region: "近畿" },
+  "米原":   { lat: 35.3147, lng: 136.2886, region: "近畿" },
+  "大垣":   { lat: 35.3622, lng: 136.6147, region: "東海" },
+  "名古屋": { lat: 35.1709, lng: 136.8816, region: "東海" },
+  "豊橋":   { lat: 34.7625, lng: 137.3914, region: "東海" },
+  "浜松":   { lat: 34.7050, lng: 137.7269, region: "東海" },
+  "静岡":   { lat: 34.9756, lng: 138.3828, region: "東海" },
+  "熱海":   { lat: 35.0956, lng: 139.0789, region: "関東" },
+  "小田原": { lat: 35.2564, lng: 139.1564, region: "関東" },
+  "横浜":   { lat: 35.4658, lng: 139.6222, region: "関東" },
+  "東京":   { lat: 35.6812, lng: 139.7671, region: "関東" },
+  "大宮":   { lat: 35.9064, lng: 139.6236, region: "関東" },
+};
+
+// ---- メインルート（広島→東京方向。逆方向は自動生成） ----
+// type: "普通"=普通列車 / "快速"=快速 / "新快速"=新快速・特別快速（すべて18きっぷ対象）
+const MAIN_ROUTE = [
+  "広島","糸崎","岡山","相生","姫路","大阪","京都","米原","大垣","豊橋","浜松","静岡","熱海","東京"
+];
+
+// 各区間の典型運行情報（難所・路線名・列車種別の目安）
+const SEGMENT_INFO = {
+  "広島-糸崎":  { line: "山陽本線", typical: "普通", freqMin: 30, note: "比較的本数が多く乗り継ぎやすい区間。途中三原で乗務員交代等あり。" },
+  "糸崎-岡山":  { line: "山陽本線", typical: "普通／快速サンライナー", freqMin: 30, note: "快速「サンライナー」運転時は時短に。福山で乗客の入れ替わりが多い。" },
+  "岡山-相生":  { line: "山陽本線", typical: "普通", freqMin: 60, note: "★難所「船坂越え」。本数が1時間1本程度と少なく、編成も短いため混雑注意。" },
+  "相生-姫路":  { line: "山陽本線／赤穂線", typical: "普通", freqMin: 30, note: "相生で対面乗り換えのことが多い。混雑回避には赤穂線経由（姫路~播州赤穂~岡山）も。" },
+  "姫路-大阪":  { line: "JR神戸線", typical: "新快速", freqMin: 15, note: "新快速が15分間隔。クロスシートで快適、18きっぷ旅で最も楽な区間。" },
+  "大阪-京都":  { line: "JR京都線", typical: "新快速", freqMin: 15, note: "新快速で乗り換えなしの場合が多い。" },
+  "京都-米原":  { line: "琵琶湖線", typical: "新快速", freqMin: 15, note: "野洲・草津以北は新快速が各駅停車区間に。" },
+  "米原-大垣":  { line: "東海道本線", typical: "普通", freqMin: 30, note: "★難所「関ヶ原越え」。1時間2本程度・4両編成が基本で混雑しやすい。" },
+  "大垣-豊橋":  { line: "東海道本線", typical: "快速／新快速", freqMin: 30, note: "通称「大垣ダッシュ」。大垣での乗換時間が短いことが多く、走らずに余裕を持って。" },
+  "豊橋-浜松":  { line: "東海道本線", typical: "普通", freqMin: 30, note: "比較的本数があり乗りやすい区間。" },
+  "浜松-静岡":  { line: "東海道本線", typical: "普通", freqMin: 30, note: "静岡県内は距離が長く時間がかかるが本数は安定。" },
+  "静岡-熱海":  { line: "東海道本線", typical: "普通／快速アクティ", freqMin: 60, note: "沼津方面との接続に注意。" },
+  "熱海-東京":  { line: "東海道線（上野東京ライン）", typical: "普通", freqMin: 15, note: "★「熱海ダッシュ」。乗換時間が3分程度の場合があり、降車前に車両中央付近へ移動推奨。" },
+};
+
+// ---- サンプル時刻表（広島→東京方向／平日・目安） ----
+// 実際の発着は日によって変動。あくまで「典型パターン」のたたき台。
+const SAMPLE_TIMETABLE_OUTBOUND = [
+  { from: "広島", to: "糸崎",   dep: "06:08", arr: "07:24", train: "普通 三原行", platform: "広島駅 4番のりば" },
+  { from: "糸崎", to: "岡山",   dep: "07:31", arr: "08:35", train: "普通 岡山行", platform: "糸崎駅 2番のりば" },
+  { from: "岡山", to: "相生",   dep: "08:46", arr: "09:48", train: "普通 上郡行", platform: "岡山駅 5番のりば" },
+  { from: "相生", to: "姫路",   dep: "09:52", arr: "10:11", train: "普通 姫路行", platform: "相生駅 3番のりば" },
+  { from: "姫路", to: "大阪",   dep: "10:20", arr: "11:38", train: "新快速 野洲行", platform: "姫路駅 4番のりば" },
+  { from: "大阪", to: "京都",   dep: "11:41", arr: "12:11", train: "新快速 敦賀行", platform: "大阪駅 8番のりば" },
+  { from: "京都", to: "米原",   dep: "12:14", arr: "13:03", train: "新快速 敦賀行（直通）", platform: "京都駅 3番のりば" },
+  { from: "米原", to: "大垣",   dep: "13:09", arr: "13:39", train: "普通 大垣行", platform: "米原駅 5番のりば" },
+  { from: "大垣", to: "豊橋",   dep: "13:55", arr: "15:08", train: "新快速 豊橋行", platform: "大垣駅 2番のりば（乗換時間短め注意）" },
+  { from: "豊橋", to: "浜松",   dep: "15:14", arr: "15:46", train: "普通 浜松行", platform: "豊橋駅 3番のりば" },
+  { from: "浜松", to: "静岡",   dep: "15:51", arr: "17:00", train: "普通 静岡行", platform: "浜松駅 4番のりば" },
+  { from: "静岡", to: "熱海",   dep: "17:08", arr: "18:25", train: "普通 熱海行", platform: "静岡駅 6番のりば" },
+  { from: "熱海", to: "東京",   dep: "18:28", arr: "20:20", train: "普通 上野東京ライン 東京行", platform: "熱海駅 3番のりば（熱海ダッシュ注意）" },
+];
+
+// ---- サンプル時刻表（東京→広島方向／平日・目安） ----
+// 広島→東京とは別に、時系列が正しくなるよう個別に用意。MAIN_ROUTEの隣接駅ごとに1区間。
+// （参考：実際の18きっぷ旅行記の典型的な乗り継ぎパターンを基にした目安）
+const SAMPLE_TIMETABLE_INBOUND = [
+  { from: "東京", to: "熱海",   dep: "06:07", arr: "07:59", train: "普通 東海道線 熱海行（熱海ダッシュ注意）", platform: "東京駅 8番のりば" },
+  { from: "熱海", to: "静岡",   dep: "08:02", arr: "09:20", train: "普通 静岡行", platform: "熱海駅 3番のりば" },
+  { from: "静岡", to: "浜松",   dep: "09:21", arr: "10:07", train: "普通 浜松行", platform: "静岡駅 5番のりば" },
+  { from: "浜松", to: "豊橋",   dep: "10:17", arr: "11:17", train: "普通 豊橋行", platform: "浜松駅 3番のりば" },
+  { from: "豊橋", to: "大垣",   dep: "11:21", arr: "12:46", train: "新快速 大垣行", platform: "豊橋駅 4番のりば" },
+  { from: "大垣", to: "米原",   dep: "13:12", arr: "13:47", train: "普通 米原行（関ヶ原越え）", platform: "大垣駅 2番のりば" },
+  { from: "米原", to: "京都",   dep: "13:50", arr: "14:39", train: "琵琶湖線新快速 網干行（直通）", platform: "米原駅 3番のりば" },
+  { from: "京都", to: "大阪",   dep: "14:39", arr: "15:09", train: "新快速 網干行（直通）", platform: "京都駅 3番のりば" },
+  { from: "大阪", to: "姫路",   dep: "15:09", arr: "16:16", train: "新快速 網干行（直通）", platform: "大阪駅 8番のりば" },
+  { from: "姫路", to: "相生",   dep: "16:36", arr: "16:55", train: "普通 播州赤穂行", platform: "姫路駅 6番のりば" },
+  { from: "相生", to: "岡山",   dep: "16:59", arr: "18:25", train: "普通 岡山行（船坂越え）", platform: "相生駅 1番のりば" },
+  { from: "岡山", to: "糸崎",   dep: "18:34", arr: "19:38", train: "普通 糸崎行", platform: "岡山駅 6番のりば" },
+  { from: "糸崎", to: "広島",   dep: "19:45", arr: "20:59", train: "普通 広島行", platform: "糸崎駅 2番のりば" },
+];
+
+
+// ---- 途中駅の観光・お土産・名物グルメ（厳選） ----
+const SPOT_INFO = {
+  "広島": {
+    sights: ["広島平和記念公園・原爆ドーム", "広島城", "本通商店街"],
+    souvenirs: ["もみじ饅頭", "広島レモン菓子", "熊野筆"],
+    food: ["広島風お好み焼き", "汁なし担々麺", "牡蠣料理"]
+  },
+  "糸崎": {
+    sights: ["三原城跡（隣接・三原駅）", "瀬戸内海の港町風景"],
+    souvenirs: ["八天堂のくりーむパン（三原）", "たこ加工品"],
+    food: ["三原たこ料理", "瀬戸内レモンスイーツ"]
+  },
+  "岡山": {
+    sights: ["岡山城", "後楽園", "瀬戸大橋を望む港町"],
+    souvenirs: ["きびだんご", "マスカット製品", "ままかり寿司"],
+    food: ["岡山ばら寿司", "デミカツ丼", "蒜山おこわ"]
+  },
+  "相生": {
+    sights: ["かきしま海水浴場周辺", "相生港の眺め"],
+    souvenirs: ["播州そうめん", "かき製品"],
+    food: ["相生かきめし"]
+  },
+  "姫路": {
+    sights: ["姫路城（世界遺産）", "好古園"],
+    souvenirs: ["姫路菓子處 杵屋の和菓子", "玉椿"],
+    food: ["姫路おでん", "穴子料理"]
+  },
+  "大阪": {
+    sights: ["大阪城", "道頓堀・グリコサイン", "通天閣"],
+    souvenirs: ["551蓬莱の豚まん", "りくろーおじさんのチーズケーキ"],
+    food: ["お好み焼き", "たこ焼き", "串カツ"]
+  },
+  "京都": {
+    sights: ["京都駅・東本願寺", "京都タワー"],
+    souvenirs: ["八つ橋", "宇治抹茶スイーツ"],
+    food: ["京漬物", "京うどん", "湯豆腐"]
+  },
+  "米原": {
+    sights: ["琵琶湖の眺め", "彦根城（米原から電車で数分）"],
+    souvenirs: ["近江牛佃煮", "鮒ずし"],
+    food: ["近江牛料理", "鮒ずし"]
+  },
+  "大垣": {
+    sights: ["大垣城", "水の都・大垣の湧水スポット"],
+    souvenirs: ["柿羊羹", "大垣の地酒"],
+    food: ["大垣の水まんじゅう", "鉄板ナポリタン"]
+  },
+  "豊橋": {
+    sights: ["豊橋市electronics 路面電車（豊橋市内線）", "豊橋公園"],
+    souvenirs: ["ヤマサちくわ", "うずら饅頭"],
+    food: ["豊橋カレーうどん", "ヤマサちくわの天ぷら"]
+  },
+  "浜松": {
+    sights: ["浜松城", "浜名湖（電車から一部車窓）"],
+    souvenirs: ["うなぎパイ", "浜松餃子セット"],
+    food: ["浜松餃子", "うなぎ料理"]
+  },
+  "静岡": {
+    sights: ["駿府城公園", "静岡浅間神社"],
+    souvenirs: ["静岡茶", "わさび漬け"],
+    food: ["静岡おでん", "桜エビ料理"]
+  },
+  "熱海": {
+    sights: ["熱海海浜公園", "熱海温泉街"],
+    souvenirs: ["熱海プリン", "干物"],
+    food: ["金目鯛料理", "熱海温泉まんじゅう"]
+  },
+  "東京": {
+    sights: ["東京駅丸の内駅舎", "皇居外苑"],
+    souvenirs: ["東京ばな奈", "雷おこし"],
+    food: ["江戸前寿司", "もんじゃ焼き"]
+  }
+};
+
+// ---- おすすめコース（途中下車プラン） ----
+const RECOMMENDED_COURSES = [
+  {
+    id: "standard",
+    title: "王道ノンストップコース",
+    summary: "広島→東京（または逆）を1日で走破する定番ルート。とにかく早く・安く移動したい人向け。",
+    tags: ["最短", "強行軍"],
+    stops: ["広島", "岡山", "姫路", "大阪", "米原", "大垣", "豊橋", "熱海", "東京"],
+    durationHint: "約14〜15時間（休憩込み）"
+  },
+  {
+    id: "gourmet",
+    title: "途中下車グルメコース",
+    summary: "姫路城・大阪・浜松で途中下車してご当地グルメを満喫。移動を2日に分けるのがおすすめ。",
+    tags: ["観光", "グルメ", "2日プラン"],
+    stops: ["広島", "岡山", "姫路（途中下車）", "大阪（途中下車・一泊）", "浜松（途中下車）", "東京"],
+    durationHint: "2日間（大阪で一泊想定）"
+  },
+  {
+    id: "castle",
+    title: "お城めぐりコース",
+    summary: "姫路城・大垣城・小田原方面の城下町をゆったり楽しむルート。",
+    tags: ["観光", "歴史"],
+    stops: ["広島", "岡山", "姫路（途中下車）", "大垣（途中下車）", "東京"],
+    durationHint: "2日間"
+  },
+  {
+    id: "relax",
+    title: "温泉ゆったりコース",
+    summary: "終盤の熱海で一泊し、温泉を楽しんでから東京入りするゆとりプラン。",
+    tags: ["温泉", "ゆったり"],
+    stops: ["広島", "岡山", "姫路", "大阪", "豊橋", "熱海（途中下車・一泊）", "東京"],
+    durationHint: "2日間（熱海で一泊）"
+  }
+];
+
+window.SEISYUN18_DATA = {
+  STATIONS, MAIN_ROUTE, SEGMENT_INFO,
+  SAMPLE_TIMETABLE_OUTBOUND, SAMPLE_TIMETABLE_INBOUND,
+  SPOT_INFO, RECOMMENDED_COURSES
+};
+
+</script>
+<script>
+// ============================================================
+// 青春18きっぷ 旅の手帖 - アプリ本体
+// ============================================================
+const D = window.SEISYUN18_DATA;
+const STATION_ORDER = D.MAIN_ROUTE; // 広島→東京順
+
+function stationIndex(name){ return STATION_ORDER.indexOf(name); }
+
+function segKey(a, b){ return `${a}-${b}`; }
+
+// 区間情報（常に「広島側→東京側」の順で登録してあるので、向きを正規化して取得）
+function getSegmentInfo(a, b){
+  const ia = stationIndex(a), ib = stationIndex(b);
+  if(ia < ib){ return D.SEGMENT_INFO[segKey(a,b)]; }
+  return D.SEGMENT_INFO[segKey(b,a)];
+}
+
+// ---------------- パネル切り替え ----------------
+function initTabs(){
+  const buttons = document.querySelectorAll('#tabbar button');
+  buttons.forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      buttons.forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+      document.getElementById(btn.dataset.panel).classList.add('active');
+      window.scrollTo(0,0);
+      document.getElementById('main').scrollTo(0,0);
+    });
+  });
+}
+
+// ---------------- 駅セレクト用オプション生成 ----------------
+function stationOptionsHTML(selected){
+  return STATION_ORDER.map(s=>{
+    const reg = D.STATIONS[s].region;
+    return `<option value="${s}" ${s===selected?'selected':''}>${s}（${reg}）</option>`;
+  }).join('');
+}
+
+// ============================================================
+// 機能①: 出発地・目的地 → 経路と時刻表（目安）
+// ============================================================
+function buildRoutePanel(){
+  const main = document.getElementById('main');
+  const panel = document.createElement('div');
+  panel.id = 'panel-route';
+  panel.className = 'panel active';
+  panel.innerHTML = `
+    <h2 class="panel-title">🚃 乗るべき電車を調べる</h2>
+    <p class="panel-desc">出発駅と目的駅を選ぶと、普通・快速・新快速だけを使った乗り換えルートと目安の時刻・のりばを表示します。</p>
+
+    <div class="card">
+      <div class="field-row">
+        <label class="field-label">出発駅</label>
+        <select id="dep-select">${stationOptionsHTML('広島')}</select>
+      </div>
+      <div class="swap-btn" id="swap-btn" title="出発地と目的地を入れ替える">⇅</div>
+      <div class="field-row">
+        <label class="field-label">目的駅</label>
+        <select id="arr-select">${stationOptionsHTML('東京')}</select>
+      </div>
+      <button class="btn-primary" id="search-route-btn">この区間の乗り換えを調べる</button>
+    </div>
+
+    <div id="route-result"></div>
+  `;
+  main.appendChild(panel);
+
+  document.getElementById('swap-btn').addEventListener('click', ()=>{
+    const dep = document.getElementById('dep-select');
+    const arr = document.getElementById('arr-select');
+    const tmp = dep.value; dep.value = arr.value; arr.value = tmp;
+  });
+
+  document.getElementById('search-route-btn').addEventListener('click', renderRouteResult);
+
+  // 初回表示
+  renderRouteResult();
+}
+
+function buildLegSampleTime(fromName, toName){
+  // 広島→東京方向なら SAMPLE_TIMETABLE_OUTBOUND、
+  // 東京→広島方向なら SAMPLE_TIMETABLE_INBOUND（いずれも時系列が正しい実データベース）を使う。
+  const ia = stationIndex(fromName), ib = stationIndex(toName);
+  const forward = ia < ib; // 広島側→東京側
+  const table = forward ? D.SAMPLE_TIMETABLE_OUTBOUND : D.SAMPLE_TIMETABLE_INBOUND;
+  const rec = table.find(r => r.from === fromName && r.to === toName);
+  if(!rec) return null;
+  return { dep: rec.dep, arr: rec.arr, train: rec.train, platform: rec.platform };
+}
+
+function renderRouteResult(){
+  const depName = document.getElementById('dep-select').value;
+  const arrName = document.getElementById('arr-select').value;
+  const resultDiv = document.getElementById('route-result');
+
+  if(depName === arrName){
+    resultDiv.innerHTML = `<p class="empty-hint">出発駅と目的駅が同じです。別の駅を選んでください。</p>`;
+    return;
+  }
+
+  const ia = stationIndex(depName), ib = stationIndex(arrName);
+  const forward = ia < ib;
+  const lo = Math.min(ia, ib), hi = Math.max(ia, ib);
+  const stops = STATION_ORDER.slice(lo, hi+1);
+  const orderedStops = forward ? stops : stops.slice().reverse();
+
+  let legsHTML = '';
+  let totalNote = [];
+  for(let i=0; i<orderedStops.length-1; i++){
+    const from = orderedStops[i];
+    const to = orderedStops[i+1];
+    const info = getSegmentInfo(from, to);
+    const sample = buildLegSampleTime(from, to);
+    const isLast = i === orderedStops.length-2;
+    const hazard = info && /★/.test(info.note);
+    if(hazard) totalNote.push(info.note.replace('★',''));
+
+    legsHTML += `
+      <div class="leg">
+        <div class="leg-line">
+          <div class="leg-dot"></div>
+          ${!isLast ? '<div class="leg-track"></div>' : ''}
+        </div>
+        <div class="leg-body">
+          <div class="leg-time">${sample ? sample.dep : '目安なし'} 発</div>
+          <div class="leg-station">${from} <span style="color:var(--ink-soft);font-weight:500;font-size:12px;">→ ${to}</span></div>
+          <div class="leg-meta">
+            <span class="badge">${info ? info.line : ''}</span>${sample ? sample.train : (info ? info.typical : '')}
+            ${sample ? `（${sample.arr} ${to}着）` : ''}
+            ${hazard ? `<span class="warn">⚠ ${info.note}</span>` : ''}
+          </div>
+          ${sample ? `<div class="leg-platform"><span class="pin">📍</span> ${sample.platform}</div>` : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  // 終点着
+  const finalSample = buildLegSampleTime(orderedStops[orderedStops.length-2], orderedStops[orderedStops.length-1]);
+  legsHTML += `
+    <div class="leg">
+      <div class="leg-line"><div class="leg-dot" style="background:var(--lemon);border-color:var(--navy);"></div></div>
+      <div class="leg-body">
+        <div class="leg-time">${finalSample ? finalSample.arr : ''} 着</div>
+        <div class="leg-station">${orderedStops[orderedStops.length-1]} 🏁</div>
+      </div>
+    </div>
+  `;
+
+  resultDiv.innerHTML = `
+    <div class="disclaimer">
+      <span class="mark">⚠️</span>
+      <span>表示時刻は典型的なダイヤを基にした<b>目安</b>です。実際の発着・のりばは日付や曜日（平日/土休日）で変わります。出発前に必ずNAVITIME・Yahoo!乗換案内・JR時刻表で最新の時刻をご確認ください。</span>
+    </div>
+    <div class="card">
+      <div style="font-size:13px;font-weight:800;color:var(--navy);margin-bottom:10px;">
+        ${depName} → ${arrName}　全${orderedStops.length-1}区間・乗り換え${orderedStops.length-2}回
+      </div>
+      ${legsHTML}
+    </div>
+    ${totalNote.length ? `
+      <div class="card" style="border-color:var(--line-red);">
+        <div style="font-size:12.5px;font-weight:800;color:var(--line-red);margin-bottom:6px;">⚠ このルートの難所</div>
+        <ul style="margin:0;padding-left:18px;font-size:12px;color:var(--ink-soft);line-height:1.6;">
+          ${totalNote.map(n=>`<li>${n}</li>`).join('')}
+        </ul>
+      </div>` : ''}
+  `;
+}
+
+// ============================================================
+// 機能②: 途中駅の観光地・お土産・名物グルメ
+// ============================================================
+function buildSpotPanel(){
+  const main = document.getElementById('main');
+  const panel = document.createElement('div');
+  panel.id = 'panel-spot';
+  panel.className = 'panel';
+  panel.innerHTML = `
+    <h2 class="panel-title">🏯 途中駅のお楽しみ</h2>
+    <p class="panel-desc">気になる駅をタップすると、周辺の観光地・お土産・名物料理をまとめて紹介します。</p>
+    <div class="station-select-row" id="spot-chip-row"></div>
+    <div id="spot-detail"></div>
+  `;
+  main.appendChild(panel);
+
+  const chipRow = document.getElementById('spot-chip-row');
+  chipRow.innerHTML = STATION_ORDER.map(s=>
+    `<div class="chip" data-station="${s}">${s}</div>`
+  ).join('');
+
+  chipRow.querySelectorAll('.chip').forEach(chip=>{
+    chip.addEventListener('click', ()=>{
+      chipRow.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+      chip.classList.add('active');
+      renderSpotDetail(chip.dataset.station);
+    });
+  });
+
+  // 初期表示：広島
+  chipRow.querySelector('.chip').classList.add('active');
+  renderSpotDetail(STATION_ORDER[0]);
+}
+
+function renderSpotDetail(stationName){
+  const detail = document.getElementById('spot-detail');
+  const info = D.SPOT_INFO[stationName];
+  if(!info){
+    detail.innerHTML = `<p class="empty-hint">この駅の情報は現在準備中です。</p>`;
+    return;
+  }
+  detail.innerHTML = `
+    <div class="card">
+      <div style="font-size:16px;font-weight:800;color:var(--navy);margin-bottom:2px;">${stationName}駅 周辺</div>
+      <div style="font-size:11.5px;color:var(--ink-soft);margin-bottom:4px;">${D.STATIONS[stationName].region}地方</div>
+      <hr class="perf">
+      <div class="spot-section-title">🗼 人気の観光地</div>
+      <div class="tag-list">${info.sights.map(x=>`<span class="tag-pill">${x}</span>`).join('')}</div>
+      <div class="spot-section-title">🎁 お土産</div>
+      <div class="tag-list">${info.souvenirs.map(x=>`<span class="tag-pill">${x}</span>`).join('')}</div>
+      <div class="spot-section-title">🍽️ 名物料理</div>
+      <div class="tag-list">${info.food.map(x=>`<span class="tag-pill">${x}</span>`).join('')}</div>
+    </div>
+  `;
+}
+
+// ============================================================
+// 機能③: 行き先の天気予報（Open-Meteo APIによるリアルタイム取得）
+// ============================================================
+const WEATHER_CODE_MAP = {
+  0:['☀️','快晴'],1:['🌤️','晴れ'],2:['⛅','晴れ時々曇り'],3:['☁️','曇り'],
+  45:['🌫️','霧'],48:['🌫️','霧（霜）'],
+  51:['🌦️','弱い霧雨'],53:['🌦️','霧雨'],55:['🌧️','強い霧雨'],
+  61:['🌦️','弱い雨'],63:['🌧️','雨'],65:['🌧️','強い雨'],
+  71:['🌨️','弱い雪'],73:['🌨️','雪'],75:['❄️','強い雪'],
+  80:['🌦️','にわか雨'],81:['🌧️','にわか雨（やや強い）'],82:['⛈️','激しいにわか雨'],
+  95:['⛈️','雷雨'],96:['⛈️','雷雨（あられ）'],99:['⛈️','激しい雷雨（あられ）']
+};
+function weatherIcon(code){ return (WEATHER_CODE_MAP[code]||['🌡️','—'])[0]; }
+function weatherDesc(code){ return (WEATHER_CODE_MAP[code]||['🌡️','不明'])[1]; }
+
+function buildWeatherPanel(){
+  const main = document.getElementById('main');
+  const panel = document.createElement('div');
+  panel.id = 'panel-weather';
+  panel.className = 'panel';
+  panel.innerHTML = `
+    <h2 class="panel-title">☀️ 行き先の天気</h2>
+    <p class="panel-desc">駅を選ぶと気象庁データを使った無料サービス（Open-Meteo）からリアルタイムの天気を取得します。</p>
+    <div class="card">
+      <label class="field-label">天気を見る駅</label>
+      <select id="weather-station-select">${stationOptionsHTML('東京')}</select>
+    </div>
+    <div id="weather-result"></div>
+  `;
+  main.appendChild(panel);
+
+  document.getElementById('weather-station-select').addEventListener('change', (e)=>{
+    fetchWeather(e.target.value);
+  });
+
+  fetchWeather('東京');
+}
+
+async function fetchWeather(stationName){
+  const resultDiv = document.getElementById('weather-result');
+  const coord = D.STATIONS[stationName];
+  resultDiv.innerHTML = `<div class="loading-row"><div class="spinner"></div>${stationName}の天気を取得中…</div>`;
+
+  try{
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${coord.lat}&longitude=${coord.lng}&current=temperature_2m,weather_code,relative_humidity_2m,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=Asia%2FTokyo&forecast_days=6`;
+    const res = await fetch(url);
+    if(!res.ok) throw new Error('weather fetch failed');
+    const data = await res.json();
+
+    const cur = data.current;
+    const daily = data.daily;
+
+    const dayLabels = daily.time.map((d,i)=>{
+      const dt = new Date(d+'T00:00:00');
+      const wd = ['日','月','火','水','木','金','土'][dt.getDay()];
+      return i===0 ? '今日' : `${dt.getMonth()+1}/${dt.getDate()}(${wd})`;
+    });
+
+    resultDiv.innerHTML = `
+      <div class="weather-hero">
+        <div class="wicon">${weatherIcon(cur.weather_code)}</div>
+        <div class="wcity">${stationName}駅（${coord.region}）</div>
+        <div class="wtemp">${Math.round(cur.temperature_2m)}<span style="font-size:20px;">℃</span></div>
+        <div class="wdesc">${weatherDesc(cur.weather_code)}</div>
+        <div class="wgrid">
+          <div class="wcell"><div class="wl">湿度</div><div class="wv">${cur.relative_humidity_2m}%</div></div>
+          <div class="wcell"><div class="wl">風速</div><div class="wv">${cur.wind_speed_10m}m/s</div></div>
+          <div class="wcell"><div class="wl">降水確率</div><div class="wv">${daily.precipitation_probability_max[0]}%</div></div>
+        </div>
+      </div>
+      <div style="font-size:12px;font-weight:800;color:var(--navy);margin-bottom:8px;">これからの6日間</div>
+      <div class="forecast-row">
+        ${daily.time.map((d,i)=>`
+          <div class="fday">
+            <div class="fd-label">${dayLabels[i]}</div>
+            <div class="fd-icon">${weatherIcon(daily.weather_code[i])}</div>
+            <div class="fd-temp">${Math.round(daily.temperature_2m_max[i])}° <span class="lo">${Math.round(daily.temperature_2m_min[i])}°</span></div>
+          </div>
+        `).join('')}
+      </div>
+      <div class="disclaimer" style="margin-top:14px;">
+        <span class="mark">ℹ️</span>
+        <span>気象データは Open-Meteo（オープンデータ）からリアルタイムに取得しています。出発当日は念のため気象庁や天気アプリでも再確認してください。</span>
+      </div>
+    `;
+  }catch(err){
+    resultDiv.innerHTML = `<p class="empty-hint">天気情報の取得に失敗しました。通信環境をご確認のうえ、もう一度お試しください。</p>`;
+  }
+}
+
+// ============================================================
+// 機能④: おすすめコース
+// ============================================================
+function buildCoursePanel(){
+  const main = document.getElementById('main');
+  const panel = document.createElement('div');
+  panel.id = 'panel-course';
+  panel.className = 'panel';
+  panel.innerHTML = `
+    <h2 class="panel-title">🧭 おすすめコース</h2>
+    <p class="panel-desc">旅のスタイルに合わせたコースを選べます。タップすると地図タブにルートが反映されます。</p>
+    <div id="course-list"></div>
+  `;
+  main.appendChild(panel);
+  renderCourseList();
+}
+
+let selectedCourseId = null;
+
+function renderCourseList(){
+  const list = document.getElementById('course-list');
+  list.innerHTML = D.RECOMMENDED_COURSES.map(c=>`
+    <div class="course-card ${selectedCourseId===c.id ? 'selected':''}" data-course="${c.id}">
+      <h3>${c.title}</h3>
+      <p>${c.summary}</p>
+      <div class="course-tags">${c.tags.map(t=>`<span>${t}</span>`).join('')}</div>
+      <div class="course-route">🚉 ${c.stops.join(' → ')}</div>
+      <div class="course-duration">⏱ ${c.durationHint}</div>
+    </div>
+  `).join('');
+
+  list.querySelectorAll('.course-card').forEach(card=>{
+    card.addEventListener('click', ()=>{
+      selectedCourseId = card.dataset.course;
+      renderCourseList();
+      // 地図タブにも反映
+      renderMapForCourse(selectedCourseId);
+      // 地図タブへ自動切り替え
+      document.querySelector('#tabbar button[data-panel="panel-map"]').click();
+    });
+  });
+}
+
+// ============================================================
+// 機能⑤: 地図統合表示（実際の日本地図 + ①〜④の情報）
+// ============================================================
+let leafletMap = null;
+let mapMarkers = [];
+let mapPolyline = null;
+
+function buildMapPanel(){
+  const main = document.getElementById('main');
+  const panel = document.createElement('div');
+  panel.id = 'panel-map';
+  panel.className = 'panel';
+  panel.innerHTML = `
+    <h2 class="panel-title">🗺️ 地図でまるごと確認</h2>
+    <p class="panel-desc">時刻表・観光情報・天気をまとめて日本地図に重ねて表示します。駅マーカーをタップすると詳細が見られます。</p>
+    <div id="mapview"></div>
+    <div class="map-legend">
+      <span><span class="legend-dot" style="background:var(--navy);"></span>通過駅</span>
+      <span><span class="legend-dot" style="background:var(--lemon);"></span>出発／到着駅</span>
+      <span><span class="legend-dot" style="background:var(--line-red);"></span>難所区間あり</span>
+    </div>
+    <div class="card">
+      <div style="font-size:13px;font-weight:800;color:var(--navy);margin-bottom:8px;" id="map-route-title">広島 → 東京（全区間表示中）</div>
+      <div class="map-station-list" id="map-station-list"></div>
+    </div>
+  `;
+  main.appendChild(panel);
+
+  leafletMap = L.map('mapview', { zoomControl:true, attributionControl:true })
+    .setView([35.0, 136.5], 6);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 18,
+    attribution: '© OpenStreetMap contributors'
+  }).addTo(leafletMap);
+
+  // 初期表示：時刻表タブで選ばれている出発〜目的駅を表示
+  syncMapWithRouteSelection();
+}
+
+// 出発/目的駅（機能①の選択）に合わせて地図を更新
+function syncMapWithRouteSelection(){
+  const depSel = document.getElementById('dep-select');
+  const arrSel = document.getElementById('arr-select');
+  const dep = depSel ? depSel.value : '広島';
+  const arr = arrSel ? arrSel.value : '東京';
+  renderMapForStations(dep, arr, `${dep} → ${arr}`);
+}
+
+function renderMapForCourse(courseId){
+  const course = D.RECOMMENDED_COURSES.find(c=>c.id===courseId);
+  if(!course) return;
+  // コースの停車駅名から括弧注記を除去して実駅名に変換
+  const cleanStops = course.stops.map(s=>s.replace(/（.*）/,''));
+  renderMapForStationList(cleanStops, course.title, course.stops);
+}
+
+function renderMapForStations(depName, arrName, title){
+  const ia = stationIndex(depName), ib = stationIndex(arrName);
+  const lo = Math.min(ia,ib), hi = Math.max(ia,ib);
+  let stops = STATION_ORDER.slice(lo, hi+1);
+  if(ia > ib) stops = stops.slice().reverse();
+  renderMapForStationList(stops, title, stops);
+}
+
+async function renderMapForStationList(stopNames, title, displayLabels){
+  document.getElementById('map-route-title').textContent = `${title}`;
+
+  // 既存マーカー/ラインをクリア
+  mapMarkers.forEach(m=>leafletMap.removeLayer(m));
+  mapMarkers = [];
+  if(mapPolyline){ leafletMap.removeLayer(mapPolyline); mapPolyline = null; }
+
+  const latlngs = [];
+  const listDiv = document.getElementById('map-station-list');
+  listDiv.innerHTML = stopNames.map((s,i)=>`
+    <div class="ms-item" id="ms-item-${i}">
+      <div class="ms-num">${i+1}</div>
+      <div>${displayLabels ? displayLabels[i] : s}</div>
+      <div class="ms-weather" id="ms-weather-${i}">…</div>
+    </div>
+  `).join('');
+
+  stopNames.forEach((s, i)=>{
+    const coord = D.STATIONS[s];
+    if(!coord) return;
+    latlngs.push([coord.lat, coord.lng]);
+
+    const isEdge = (i===0 || i===stopNames.length-1);
+    const hazardNear = (i>0 && isHazardSegment(stopNames[i-1], s)) || (i<stopNames.length-1 && isHazardSegment(s, stopNames[i+1]));
+
+    const marker = L.circleMarker([coord.lat, coord.lng], {
+      radius: isEdge ? 9 : 6,
+      color: hazardNear ? '#b5483f' : '#1c2f4a',
+      fillColor: isEdge ? '#e8b730' : '#1c2f4a',
+      fillOpacity: 1,
+      weight: 2
+    }).addTo(leafletMap);
+
+    const spot = D.SPOT_INFO[s];
+    const popupHTML = `
+      <div style="font-family:sans-serif;min-width:160px;">
+        <b style="font-size:14px;">${s}駅</b><br>
+        <span style="font-size:11px;color:#5b6470;">${coord.region}地方</span>
+        ${spot ? `<div style="margin-top:6px;font-size:12px;">
+          🏯 ${spot.sights[0]}<br>
+          🎁 ${spot.souvenirs[0]}<br>
+          🍽️ ${spot.food[0]}
+        </div>` : ''}
+      </div>
+    `;
+    marker.bindPopup(popupHTML);
+    marker.on('click', ()=>{
+      const el = document.getElementById(`ms-item-${i}`);
+      if(el){ el.scrollIntoView({behavior:'smooth', block:'nearest'}); el.style.background = '#fff8e6'; setTimeout(()=>{el.style.background='';}, 1200); }
+    });
+    mapMarkers.push(marker);
+  });
+
+  if(latlngs.length>1){
+    mapPolyline = L.polyline(latlngs, { color:'#1c2f4a', weight:3, opacity:.7, dashArray:'1 6' }).addTo(leafletMap);
+    leafletMap.fitBounds(mapPolyline.getBounds(), { padding:[28,28] });
+  }else if(latlngs.length===1){
+    leafletMap.setView(latlngs[0], 9);
+  }
+
+  // 各駅の天気を取得して一覧に反映（並列）
+  stopNames.forEach(async (s, i)=>{
+    const coord = D.STATIONS[s];
+    if(!coord) return;
+    try{
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${coord.lat}&longitude=${coord.lng}&current=temperature_2m,weather_code&timezone=Asia%2FTokyo`;
+      const res = await fetch(url);
+      const data = await res.json();
+      const el = document.getElementById(`ms-weather-${i}`);
+      if(el) el.innerHTML = `${weatherIcon(data.current.weather_code)} ${Math.round(data.current.temperature_2m)}℃`;
+    }catch(e){
+      const el = document.getElementById(`ms-weather-${i}`);
+      if(el) el.textContent = '—';
+    }
+  });
+}
+
+function isHazardSegment(a,b){
+  const info = getSegmentInfo(a,b);
+  return info && /★/.test(info.note);
+}
+
+document.addEventListener('DOMContentLoaded', ()=>{
+  buildRoutePanel();
+  buildSpotPanel();
+  buildWeatherPanel();
+  buildCoursePanel();
+  buildMapPanel();
+  initTabs();
+
+  // 時刻表検索が更新されたら地図タブにも反映できるようにする
+  document.getElementById('search-route-btn').addEventListener('click', syncMapWithRouteSelection);
+});
+
+</script>
+</body>
+</html>
